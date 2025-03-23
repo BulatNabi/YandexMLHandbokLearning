@@ -5,10 +5,13 @@ import pandas as pd
 from typing import Optional, List
 
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import make_scorer, mean_absolute_error
+from sklearn.model_selection import train_test_split, KFold, cross_val_score, GridSearchCV
 from BaseDataPreprocessor import BaseDataPreprocessor
 from MSLE import root_mean_squared_logarithmic_error
+from ExponentialLinearRegression import ExponentialLinearRegression
 seed = 24
+
 
 
 
@@ -32,16 +35,31 @@ preprocessor = BaseDataPreprocessor(needed_columns=continuous_columns)
 
 X_train = preprocessor.fit_transform(data_train)
 X_test = preprocessor.transform(data_test)
-
-model = LinearRegression()
-
-model.fit(X_train, Y_train)
-
-Y_pred = model.predict(X_test)
+X = np.concatenate((X_train, X_test), axis=0)
+Y = np.concatenate((Y_train, Y_test), axis=0)
 
 
-# Оцениваем качество модели с помощью MAE
-mae = root_mean_squared_logarithmic_error(Y_test, Y_pred)
-print(f"root_mean_squared_logarithmic_error:{mae}")
+kf=KFold(n_splits=5, shuffle=True, random_state=42)
+rmsle_scorer = make_scorer(root_mean_squared_logarithmic_error, greater_is_better=False)
+
+alphas = np.logspace(-3, 3, num=7, base=10.)
+param_grid = {
+    'alpha': alphas
+}
+model = ExponentialLinearRegression()
+
+gr = GridSearchCV(
+    estimator=model,
+    param_grid=param_grid,
+    cv=5,
+    scoring=rmsle_scorer,
+    verbose=1,
+    n_jobs=-1
+)
+
+gr.fit(X, Y)
+
+print("Best parameters:", gr.best_params_)
+print("Best score:", gr.best_score_)
 
 
